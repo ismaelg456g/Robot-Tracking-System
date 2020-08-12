@@ -29,10 +29,10 @@ class RobotColorTracking(object):
 		self.satTolerance = satTolerance
 		self.kernel = kernel
 
-		self.labels = None
-		self.image = None
+		self._labels = None
+		self._image = None
 		self.nbr_objects = None
-		self.pose = {}
+		self._pose = {}
 
 		self.colors = []
 		i = 0
@@ -64,30 +64,39 @@ class RobotColorTracking(object):
 	def _trackByColor(self,image, color):
 		image = self._segmentColor(image, color)
 		image = self._filterImage(image)
-		self.labels, self.nbr_objects = measurements.label(image)
-		center_of_mass = array(measurements.center_of_mass(image, labels=self.labels, index=range(1,self.nbr_objects+1) ), dtype=float)
+		self._labels, self.nbr_objects = measurements.label(image)
+		center_of_mass = array(measurements.center_of_mass(image, labels=self._labels, index=range(1,self.nbr_objects+1) ), dtype=float)
 
 		return center_of_mass
 
-	def track(self,image_name): #lista de cores
+	def track(self,image_name):
 		image = cv2.imread(image_name)
-		self.image = image
-		
+		self._image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
 		for color in self.colors:
-			self.pose[color.name] = self._trackByColor(image, color.value)
+			self._pose[color.name] = self._trackByColor(image, color.value)
 
 
-	def printRobotLocation(self): #precisa dos labels e nbr_objects
-		#if(self.labels == None or self.nbr_objects == None or self.pose == None):
+	def printRobotLocation(self):
+		#if(self._labels == None or self.nbr_objects == None or self.pose == None):
 		#	return
 		#print(self.pose)
-		#print("number of objects: "+str(self.nbr_objects)+"    labels:"+str(self.labels.shape))
+		#print("number of objects: "+str(self.nbr_objects)+"    labels:"+str(self._labels.shape))
 		figure(figsize=(50,50))
 		gray()
-		imshow(self.image)
+		imshow(self._image)
 		for color in self.colors:
 			for i in range(self.nbr_objects):
-			    text(self.pose[color.name][i][1], self.pose[color.name][i][0], color.name, color='red', horizontalalignment='center',verticalalignment='center')
+			    text(self._pose[color.name][i][1], self._pose[color.name][i][0], color.name, color='red', horizontalalignment='center',verticalalignment='center')
+	# Alterar visibilidade dos atributos
+	#problema com nbr_objects
+	def getPoses(self):
+		if len(self._pose)>0:
+			return self._pose
+		else:
+			print('There is no poses calculated yet')
+	def getPoseByColor(self, color):
+		return self._pose[color.name]
 
 
 
