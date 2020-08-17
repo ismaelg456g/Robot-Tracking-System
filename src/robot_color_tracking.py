@@ -23,16 +23,18 @@ class Colors(Enum):
 	pink = 165
 
 class RobotColorTracking(object):
-	def __init__(self,nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60, kernel=ones((20,20))):
+	def __init__(self,nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60, kernel=ones((20,20)), debug = False):
 		self.binaryThreshold= binaryThreshold
 		self.hueTolerance = hueTolerance
 		self.satTolerance = satTolerance
 		self.kernel = kernel
 
 		self._labels = {}
+		self._segmentedImages = {}
 		self._image = None
 		self._nbr_objects = {}
 		self._pose = {}
+		self._debug = debug
 
 		self._colors = []
 		i = 0
@@ -57,12 +59,14 @@ class RobotColorTracking(object):
 	def  _filterImage(self,image):
 		image = 1*(image>self.binaryThreshold)
 		im_open = morphology.binary_opening(image, self.kernel, iterations=1)
-		im_closed = morphology.binary_closing(image, self.kernel)
+		im_closed = morphology.binary_closing(im_open, self.kernel)
 
 		return im_closed
 
 	def _trackByColor(self,image, color):
-		image = self._segmentColor(image, color)
+		image = self._segmentColor(image, color.value)
+		if(self._debug):
+			self._segmentedImages[color.name] = image
 		image = self._filterImage(image)
 		labels, nbr_objects = measurements.label(image)
 		center_of_mass = array(measurements.center_of_mass(image, labels=labels, index=range(1,nbr_objects+1) ), dtype=float)
@@ -74,7 +78,10 @@ class RobotColorTracking(object):
 		self._image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
 		for color in self._colors:
-			self._pose[color.name], self._labels[color.name], self._nbr_objects[color.name] = self._trackByColor(image, color.value)
+			if(self._debug):
+				self._pose[color.name], self._labels[color.name], self._nbr_objects[color.name] = self._trackByColor(image, color)
+			else:
+				self._pose[color.name], _, self._nbr_objects[color.name] = self._trackByColor(image, color)
 
 
 	def printRobotLocation(self):
@@ -88,8 +95,7 @@ class RobotColorTracking(object):
 		for color in self._colors:
 			for i in range(self._nbr_objects[color.name]):
 			    text(self._pose[color.name][i][1], self._pose[color.name][i][0], color.name, color='red', horizontalalignment='center',verticalalignment='center')
-	# Alterar visibilidade dos atributos
-	#problema com _nbr_objects
+
 	def getPoses(self):
 		if len(self._pose)>0:
 			return self._pose
@@ -98,7 +104,15 @@ class RobotColorTracking(object):
 	def getPoseByColor(self, color):
 		return self._pose[color.name]
 	def printLabel(self, nbr):
-		imshow(self._labels[self._colors[nbr].name])
+		if(self._debug):
+			imshow(self._labels[self._colors[nbr].name])
+		else:
+			print('Use debug=True for utilizing this method')
+	def printSegmentedImage(self, nbr):
+		if(self._debug):
+			imshow(self._segmentedImages[self._colors[nbr].name])
+		else:
+			print('Use debug=True for utilizing this method')
 
 
 
