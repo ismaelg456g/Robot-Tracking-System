@@ -118,5 +118,3 @@ class RobotColorTracking(object):
 
 
 
-
-
