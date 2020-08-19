@@ -23,7 +23,7 @@ class Colors(Enum):
 	pink = 165
 
 class RobotColorTracking(object):
-	def __init__(self,nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60, kernel=ones((20,20)), debug = False):
+	def __init__(self,nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60, kernel=ones((20,20)), debug = False, mode='hough'):
 		self.binaryThreshold= binaryThreshold
 		self.hueTolerance = hueTolerance
 		self.satTolerance = satTolerance
@@ -35,6 +35,7 @@ class RobotColorTracking(object):
 		self._nbr_objects = {}
 		self._pose = {}
 		self._debug = debug
+		self._mode = mode
 
 		self._colors = []
 		i = 0
@@ -73,16 +74,32 @@ class RobotColorTracking(object):
 
 		return center_of_mass, 1*(labels!=0), nbr_objects
 
+	def _trackByColorHough(self, image, color):
+		image = self._segmentColor(image, color.value)
+		if(self._debug):
+			self._segmentedImages[color.name] = image
+		image = cv2.medianBlur(image, 5)
+		rows = image.shape[0]
+		circles = cv2.HoughCircles(image, cv2.HOUGH_GRADIENT, 1, rows / 8, param1=20, param2=30, minRadius=100, maxRadius=500)
+		if type(circles) == type(None):
+			circles = array([[]])
+		#print(color.name)
+		#print(str(circles.shape)+"    "+ str(circles[0, :].shape[0]))
+    	#labels debug
+		return circles[0, :], circles[0, :].shape[0]
+
 	def track(self,image_name):
 		image = cv2.imread(image_name)
 		self._image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-		for color in self._colors:
-			if(self._debug):
-				self._pose[color.name], self._labels[color.name], self._nbr_objects[color.name] = self._trackByColor(image, color)
-			else:
-				self._pose[color.name], _, self._nbr_objects[color.name] = self._trackByColor(image, color)
-
+		if(self._mode=='hough'):
+			for color in self._colors:
+				self._pose[color.name], self._nbr_objects[color.name] = self._trackByColorHough(image, color)
+		else:
+			for color in self._colors:
+				if(self._debug):
+					self._pose[color.name], self._labels[color.name], self._nbr_objects[color.name] = self._trackByColor(image, color)
+				else:
+					self._pose[color.name], _, self._nbr_objects[color.name] = self._trackByColor(image, color)
 
 	def printRobotLocation(self):
 		#if(self._labels == None or self._nbr_objects == None or self.pose == None):
@@ -94,7 +111,7 @@ class RobotColorTracking(object):
 		imshow(self._image)
 		for color in self._colors:
 			for i in range(self._nbr_objects[color.name]):
-			    text(self._pose[color.name][i][1], self._pose[color.name][i][0], color.name, color='red', horizontalalignment='center',verticalalignment='center')
+			    text(self._pose[color.name][i][0], self._pose[color.name][i][1], color.name, color='red', horizontalalignment='center',verticalalignment='center')
 
 	def getPoses(self):
 		if len(self._pose)>0:
@@ -113,8 +130,3 @@ class RobotColorTracking(object):
 			imshow(self._segmentedImages[self._colors[nbr].name])
 		else:
 			print('Use debug=True for utilizing this method')
-
-
-
-
-
