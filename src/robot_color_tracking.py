@@ -45,7 +45,7 @@ class RobotTracking(ABC):
 
 		for robotID in self._robotID:
 			for i in range(self._nbr_objects[robotID]):
-			    text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID, color='red', horizontalalignment='center',verticalalignment='center')
+			    text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID, color='white', horizontalalignment='center',verticalalignment='center')
 
 	def getPoses(self):
 		if len(self._pose)>0:
@@ -194,27 +194,80 @@ class HoughColorTrack(RobotTracking):
 
 
 class GeometricTrack(RobotTracking):
-	def __init__(self, areaBounds = (500.0, 20000.0), binaryThreshold = 140, sigma = 3, segmentMethod = '' debug = False):
+	def __init__(self, areaBounds = (500.0, 20000.0), binaryThreshold = 140, sigma = 3, segmentMethod = 'simple', color = 'green', hueTolerance = 12, satTolerance = 60, debug = False):
 		super().__init__()
 		self.areaBounds = areaBounds
 		self.binaryThreshold = binaryThreshold
+		self.hueTolerance = hueTolerance
+		self.satTolerance = satTolerance
 		self.sigma = sigma
-
+		self.segmentMethod = segmentMethod
+		if(segmentMethod=='oneColor'):
+			if type(color) == str:
+				self._color = Colors[color].value
+			else:
+				print("color must be a string. color will be set to 'green'")
+				self._color = 'green'
+		elif(segmentMethod == "multipleColors"):
+			self._color = []
+			if type(color) == list:
+				for col in color:
+					self._color.append(Colors[col].value)
+			else:
+				i=0
+				for col in Colors:
+					self._color.append(col.value)
+					i+=1
+					if i>=4:
+						break
 		self._segmentedImages = []
 
 		self._debug = debug
+	def _segmentNaive(self, image):
+		gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+		image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+		blurred = cv2.GaussianBlur(gray, (5, 5), self.sigma, self.sigma)
+		thresh = cv2.threshold(blurred, self.binaryThreshold, 255, cv2.THRESH_BINARY)[1]
+		thresh = cv2.bitwise_not(thresh)
+
+		return thresh
+	def _segmentColor(self, image, color):
+		image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+		if color == 0:
+			image[:,:,2] = (image[:,:,0] >= 180-self.hueTolerance) * image[:,:,2] + (image[:,:,0] < 0+self.hueTolerance) * image[:,:,2]
+		else:
+			image[:,:,2] = (image[:,:,0] >= color - self.hueTolerance) * image[:,:,2]
+			image[:,:,2] = (image[:,:,0] < color + self.hueTolerance) * image[:,:,2]
+		image[:,:,2] = (image[:,:,1] > self.satTolerance) * image[:,:,2]
+		image = cv2.cvtColor(cv2.cvtColor(image, cv2.COLOR_HSV2BGR),cv2.COLOR_BGR2GRAY)
+		image = cv2.threshold(image, self.binaryThreshold, 255, cv2.THRESH_BINARY)[1]
+
+		return image
+
 
 	def track(self, image_name):
 		self._image = cv2.imread(image_name)
 		resized = imutils.resize(self._image, width=300)
-		ratio = self._image.shape[0] / float(resized.shape[0])
-		gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
 		self._image = cv2.cvtColor(self._image, cv2.COLOR_BGR2RGB)
-		blurred = cv2.GaussianBlur(gray, (5, 5), self.sigma, self.sigma)
-		thresh = cv2.threshold(blurred, self.binaryThreshold, 255, cv2.THRESH_BINARY)[1]
-		thresh = cv2.bitwise_not(thresh)
+		ratio = self._image.shape[0] / float(resized.shape[0])
+		if self.segmentMethod == 'oneColor':
+			thresh = self._segmentColor(resized, self._color)
+			self._getPose(thresh, ratio)
+		elif self.segmentMethod == 'multipleColors':
+			shapes = ['triangle', 'square', 'pentagon', 'circle']
+			i=0
+			for color in self._color:
+				thresh = self._segmentColor(resized, color)
+				self._getPose(thresh, ratio, shapeToTrack=shapes[i])
+				i+=1
+		else:
+			thresh = self._segmentNaive(resized)
+			self._getPose(thresh, ratio)
 		if self._debug==True:
 			self._segmentedImage = thresh
+
+		
+	def _getPose(self, thresh, ratio, shapeToTrack = ''):
 		cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
 			cv2.CHAIN_APPROX_SIMPLE)
 		cnts = imutils.grab_contours(cnts)
@@ -227,14 +280,14 @@ class GeometricTrack(RobotTracking):
 				cX = int((M["m10"] / M["m00"]) * ratio)
 				cY = int((M["m01"] / M["m00"]) * ratio)
 				shape = self._detect(c)
-				if shape in self._pose:
-					self._pose[shape].append(array([cX, cY]))
-					self._nbr_objects[shape] += 1
-				else:
-					self._robotID.append(shape)
-					self._nbr_objects[shape] = 1
-					self._pose[shape] = [array([cX, cY])]
-
+				if(shape == shapeToTrack or shapeToTrack==''):	
+					if shape in self._pose:
+						self._pose[shape].append(array([cX, cY]))
+						self._nbr_objects[shape] += 1
+					else:
+						self._robotID.append(shape)
+						self._nbr_objects[shape] = 1
+						self._pose[shape] = [array([cX, cY])]
 	def _detect(self, c):
 		# initialize the shape name and approximate the contour
 		shape = "unidentified"
