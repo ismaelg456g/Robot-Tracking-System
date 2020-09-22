@@ -194,15 +194,27 @@ class HoughColorTrack(RobotTracking):
 
 
 class GeometricTrack(RobotTracking):
+	def __init__(self, areaBounds = (500.0, 20000.0), binaryThreshold = 140, sigma = 3, segmentMethod = '' debug = False):
+		super().__init__()
+		self.areaBounds = areaBounds
+		self.binaryThreshold = binaryThreshold
+		self.sigma = sigma
+
+		self._segmentedImages = []
+
+		self._debug = debug
+
 	def track(self, image_name):
 		self._image = cv2.imread(image_name)
 		resized = imutils.resize(self._image, width=300)
 		ratio = self._image.shape[0] / float(resized.shape[0])
 		gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
 		self._image = cv2.cvtColor(self._image, cv2.COLOR_BGR2RGB)
-		blurred = cv2.GaussianBlur(gray, (5, 5), 3,3)
-		thresh = cv2.threshold(blurred, 140, 255, cv2.THRESH_BINARY)[1]
+		blurred = cv2.GaussianBlur(gray, (5, 5), self.sigma, self.sigma)
+		thresh = cv2.threshold(blurred, self.binaryThreshold, 255, cv2.THRESH_BINARY)[1]
 		thresh = cv2.bitwise_not(thresh)
+		if self._debug==True:
+			self._segmentedImage = thresh
 		cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
 			cv2.CHAIN_APPROX_SIMPLE)
 		cnts = imutils.grab_contours(cnts)
@@ -211,7 +223,7 @@ class GeometricTrack(RobotTracking):
 			# compute the center of the contour, then detect the name of the
 			# shape using only the contour
 			M = cv2.moments(c)
-			if(M["m00"]!=0):
+			if(M["m00"]!=0 and cv2.contourArea(c)>self.areaBounds[0] and cv2.contourArea(c)<self.areaBounds[1]):
 				cX = int((M["m10"] / M["m00"]) * ratio)
 				cY = int((M["m01"] / M["m00"]) * ratio)
 				shape = self._detect(c)
@@ -250,5 +262,10 @@ class GeometricTrack(RobotTracking):
 		# return the name of the shape
 		return shape
 
-
+	#debug functions
+	def printSegmentedImage(self):
+		if(self._debug):
+			imshow(self._segmentedImage)
+		else:
+			print('Use debug=True for utilizing this method')
 
