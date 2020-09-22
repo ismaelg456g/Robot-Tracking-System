@@ -195,13 +195,14 @@ class HoughColorTrack(RobotTracking):
 
 class GeometricTrack(RobotTracking):
 	def track(self, image_name):
-		image = cv2.imread(image_name)
-		resized = imutils.resize(image, width=300)
-		ratio = image.shape[0] / float(resized.shape[0])
+		self._image = cv2.imread(image_name)
+		resized = imutils.resize(self._image, width=300)
+		ratio = self._image.shape[0] / float(resized.shape[0])
 		gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
-		blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-		thresh = cv2.threshold(blurred, 150, 255, cv2.THRESH_BINARY)[1]
-	
+		self._image = cv2.cvtColor(self._image, cv2.COLOR_BGR2RGB)
+		blurred = cv2.GaussianBlur(gray, (5, 5), 3,3)
+		thresh = cv2.threshold(blurred, 140, 255, cv2.THRESH_BINARY)[1]
+		thresh = cv2.bitwise_not(thresh)
 		cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
 			cv2.CHAIN_APPROX_SIMPLE)
 		cnts = imutils.grab_contours(cnts)
@@ -210,24 +211,18 @@ class GeometricTrack(RobotTracking):
 			# compute the center of the contour, then detect the name of the
 			# shape using only the contour
 			M = cv2.moments(c)
-			cX = int((M["m10"] / M["m00"]) * ratio)
-			cY = int((M["m01"] / M["m00"]) * ratio)
-			shape = self._detect(c)
-			# multiply the contour (x, y)-coordinates by the resize ratio,
-			# then draw the contours and the name of the shape on the image
-			c = c.astype("float")
-			c *= ratio
-			c = c.astype("int")
-			cv2.drawContours(image, [c], -1, (0, 255, 0), 2)
-			cv2.putText(image, shape, (cX, cY), cv2.FONT_HERSHEY_SIMPLEX,
-				0.5, (255, 255, 255), 2)
-			# show the output image
-			cv2.namedWindow('image',cv2.WINDOW_NORMAL)
-			cv2.resizeWindow('image', 600,600)
-			cv2.imshow("image", image)
-			cv2.waitKey(0)
+			if(M["m00"]!=0):
+				cX = int((M["m10"] / M["m00"]) * ratio)
+				cY = int((M["m01"] / M["m00"]) * ratio)
+				shape = self._detect(c)
+				if shape in self._pose:
+					self._pose[shape].append(array([cX, cY]))
+					self._nbr_objects[shape] += 1
+				else:
+					self._robotID.append(shape)
+					self._nbr_objects[shape] = 1
+					self._pose[shape] = [array([cX, cY])]
 
-		return thresh
 	def _detect(self, c):
 		# initialize the shape name and approximate the contour
 		shape = "unidentified"
