@@ -252,16 +252,19 @@ class GeometricTrack(RobotTracking):
 		ratio = self._image.shape[0] / float(resized.shape[0])
 		if self.segmentMethod == 'oneColor':
 			thresh = self._segmentColor(resized, self._color)
+			self._pose = {}
 			self._getPose(thresh, ratio)
 		elif self.segmentMethod == 'multipleColors':
 			shapes = ['triangle', 'square', 'pentagon', 'circle']
 			i=0
+			self._pose = {}
 			for color in self._color:
 				thresh = self._segmentColor(resized, color)
 				self._getPose(thresh, ratio, shapeToTrack=shapes[i])
 				i+=1
 		else:
 			thresh = self._segmentNaive(resized)
+			self._pose = {}
 			self._getPose(thresh, ratio)
 		if self._debug==True:
 			self._segmentedImage = thresh
@@ -282,12 +285,12 @@ class GeometricTrack(RobotTracking):
 				shape = self._detect(c)
 				if(shape == shapeToTrack or shapeToTrack==''):	
 					if shape in self._pose:
-						self._pose[shape].append(array([cX, cY]))
+						self._pose[shape].append([cX, cY])
 						self._nbr_objects[shape] += 1
 					else:
 						self._robotID.append(shape)
 						self._nbr_objects[shape] = 1
-						self._pose[shape] = [array([cX, cY])]
+						self._pose[shape] = [[cX, cY]]
 	def _detect(self, c):
 		# initialize the shape name and approximate the contour
 		shape = "unidentified"
@@ -299,13 +302,7 @@ class GeometricTrack(RobotTracking):
 		# if the shape has 4 vertices, it is either a square or
 		# a rectangle
 		elif len(approx) == 4:
-			# compute the bounding box of the contour and use the
-			# bounding box to compute the aspect ratio
-			(x, y, w, h) = cv2.boundingRect(approx)
-			ar = w / float(h)
-			# a square will have an aspect ratio that is approximately
-			# equal to one, otherwise, the shape is a rectangle
-			shape = "square" if ar >= 0.95 and ar <= 1.05 else "rectangle"
+			shape = "square"
 		# if the shape is a pentagon, it will have 5 vertices
 		elif len(approx) == 5:
 			shape = "pentagon"
