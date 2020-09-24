@@ -45,14 +45,16 @@ class RobotTracking(ABC):
 
 		for robotID in self._robotID:
 			for i in range(self._nbr_objects[robotID]):
-			    text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID, color='white', horizontalalignment='center',verticalalignment='center')
+				if self._pose[robotID][i].shape[0] == 2 :
+					text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID, color='white', horizontalalignment='center',verticalalignment='center')
+
 
 	def getPoses(self):
 		if len(self._pose)>0:
 			return self._pose
 		else:
 			print('There is no poses calculated yet')
-			return []
+			return {}
 
 	def getPoseByID(self, robotID):
 		return self._pose[robotID]
@@ -127,9 +129,15 @@ class ColorTrack(RobotTracking):
 			imshow(self._labels[self._colors[nbr].name])
 		else:
 			print('Use debug=True for utilizing this method')
-	def printSegmentedImage(self, nbr):
+	def printSegmentedImage(self):
 		if(self._debug):
-			imshow(self._segmentedImages[self._colors[nbr].name])
+			lines = int(len(self._segmentedImage))
+			i=1
+			for img in self._segmentedImage:
+				figure(figsize=(50,50))
+				subplot(lines, 1,i)
+				imshow(img)
+				i+=1
 		else:
 			print('Use debug=True for utilizing this method')
 
@@ -173,11 +181,12 @@ class HoughColorTrack(RobotTracking):
 		rows = image.shape[0]
 		circles = cv2.HoughCircles(image, cv2.HOUGH_GRADIENT, 1, rows / 8, param1=30, param2=20, minRadius=100, maxRadius=500)
 		if type(circles) == type(None):
-			circles = array([[]])
+			circles = array([[[]]])
 		#print(color.name)
 		#print(str(circles.shape)+"    "+ str(circles[0, :].shape[0]))
     	#labels debug
-		return circles[0, :], circles[0, :].shape[0]
+
+		return circles[0, :, :2], circles[0, :].shape[0]
 
 	def track(self,image_name):
 		image = cv2.imread(image_name)
@@ -186,9 +195,15 @@ class HoughColorTrack(RobotTracking):
 			self._pose[color.name], self._nbr_objects[color.name] = self._trackByColorHough(image, color)
 
 	#debug functions
-	def printSegmentedImage(self, nbr):
+	def printSegmentedImage(self):
 		if(self._debug):
-			imshow(self._segmentedImages[self._colors[nbr].name])
+			lines = int(len(self._segmentedImages))
+			i=1
+			for img in self._segmentedImages:
+				figure(figsize=(50,50))
+				subplot(lines, 1,i)
+				imshow(self._segmentedImages[img])
+				i+=1
 		else:
 			print('Use debug=True for utilizing this method')
 
@@ -220,7 +235,7 @@ class GeometricTrack(RobotTracking):
 					i+=1
 					if i>=4:
 						break
-		self._segmentedImages = []
+		self._segmentedImage = []
 
 		self._debug = debug
 	def _segmentNaive(self, image):
@@ -252,6 +267,8 @@ class GeometricTrack(RobotTracking):
 		ratio = self._image.shape[0] / float(resized.shape[0])
 		if self.segmentMethod == 'oneColor':
 			thresh = self._segmentColor(resized, self._color)
+			if self._debug==True:
+				self._segmentedImage.append(thresh)
 			self._pose = {}
 			self._getPose(thresh, ratio)
 		elif self.segmentMethod == 'multipleColors':
@@ -260,21 +277,24 @@ class GeometricTrack(RobotTracking):
 			self._pose = {}
 			for color in self._color:
 				thresh = self._segmentColor(resized, color)
+				if self._debug==True:
+					self._segmentedImage.append(thresh)
 				self._getPose(thresh, ratio, shapeToTrack=shapes[i])
 				i+=1
 		else:
 			thresh = self._segmentNaive(resized)
+			if self._debug==True:
+				self._segmentedImage.append(thresh)
 			self._pose = {}
 			self._getPose(thresh, ratio)
-		if self._debug==True:
-			self._segmentedImage = thresh
 
-		
+
+
 	def _getPose(self, thresh, ratio, shapeToTrack = ''):
 		cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
 			cv2.CHAIN_APPROX_SIMPLE)
 		cnts = imutils.grab_contours(cnts)
-		
+
 		for c in cnts:
 			# compute the center of the contour, then detect the name of the
 			# shape using only the contour
@@ -283,7 +303,7 @@ class GeometricTrack(RobotTracking):
 				cX = int((M["m10"] / M["m00"]) * ratio)
 				cY = int((M["m01"] / M["m00"]) * ratio)
 				shape = self._detect(c)
-				if(shape == shapeToTrack or shapeToTrack==''):	
+				if(shape == shapeToTrack or shapeToTrack==''):
 					if shape in self._pose:
 						self._pose[shape].append([cX, cY])
 						self._nbr_objects[shape] += 1
@@ -315,7 +335,12 @@ class GeometricTrack(RobotTracking):
 	#debug functions
 	def printSegmentedImage(self):
 		if(self._debug):
-			imshow(self._segmentedImage)
+			lines = int(len(self._segmentedImage))
+			i=1
+			for img in self._segmentedImage:
+				figure(figsize=(50,50))
+				subplot(lines, 1,i)
+				imshow(img)
+				i+=1
 		else:
 			print('Use debug=True for utilizing this method')
-
