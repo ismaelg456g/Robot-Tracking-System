@@ -1,6 +1,5 @@
-from scipy import *
-from pylab import *
-from numpy import *
+import matplotlib.pyplot as plt
+import numpy as np
 from abc import ABC, abstractmethod
 from enum import Enum
 from PIL import Image
@@ -39,14 +38,14 @@ class RobotTracking(ABC):
 		pass
 
 	def printRobotLocation(self):
-		figure(figsize=(50,50))
-		gray()
-		imshow(self._image)
+		plt.figure(figsize=(50,50))
+		plt.imshow(self._image)
+
 
 		for robotID in self._robotID:
 			for i in range(self._nbr_objects[robotID]):
 				if self._pose[robotID][i].shape[0] == 2 :
-					text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID, color='white', horizontalalignment='center',verticalalignment='center')
+					plt.text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID, color='white', horizontalalignment='center',verticalalignment='center')
 
 
 	def getPoses(self):
@@ -62,7 +61,7 @@ class RobotTracking(ABC):
 	#Define debug functions:
 
 class ColorTrack(RobotTracking):
-	def __init__(self,nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60, kernel=ones((20,20)), debug = False):
+	def __init__(self,nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60, kernel=np.ones((20,20)), debug = False):
 		super().__init__()
 
 		self.binaryThreshold= binaryThreshold
@@ -108,9 +107,9 @@ class ColorTrack(RobotTracking):
 			self._segmentedImages[color.name] = image
 		image = self._filterImage(image)
 		labels, nbr_objects = measurements.label(image)
-		center_of_mass = array(measurements.center_of_mass(image, labels=labels, index=range(1,nbr_objects+1) ), dtype=float)
+		center_of_mass = np.array(measurements.center_of_mass(image, labels=labels, index=range(1,nbr_objects+1) ), dtype=float)
 
-		return flip(center_of_mass, 1), 1*(labels!=0), nbr_objects
+		return np.flip(center_of_mass, 1), 1*(labels!=0), nbr_objects
 
 
 	def track(self,image_name):
@@ -126,7 +125,7 @@ class ColorTrack(RobotTracking):
 	# debug functions
 	def printLabel(self, nbr):
 		if(self._debug):
-			imshow(self._labels[self._colors[nbr].name])
+			plt.imshow(self._labels[self._colors[nbr].name])
 		else:
 			print('Use debug=True for utilizing this method')
 	def printSegmentedImage(self):
@@ -134,9 +133,9 @@ class ColorTrack(RobotTracking):
 			lines = int(len(self._segmentedImage))
 			i=1
 			for img in self._segmentedImage:
-				figure(figsize=(50,50))
-				subplot(lines, 1,i)
-				imshow(img)
+				plt.figure(figsize=(50,50))
+				plt.subplot(lines, 1,i)
+				plt.imshow(img)
 				i+=1
 		else:
 			print('Use debug=True for utilizing this method')
@@ -181,7 +180,7 @@ class HoughColorTrack(RobotTracking):
 		rows = image.shape[0]
 		circles = cv2.HoughCircles(image, cv2.HOUGH_GRADIENT, 1, rows / 8, param1=30, param2=20, minRadius=100, maxRadius=500)
 		if type(circles) == type(None):
-			circles = array([[[]]])
+			circles = np.array([[[]]])
 		#print(color.name)
 		#print(str(circles.shape)+"    "+ str(circles[0, :].shape[0]))
     	#labels debug
@@ -200,9 +199,9 @@ class HoughColorTrack(RobotTracking):
 			lines = int(len(self._segmentedImages))
 			i=1
 			for img in self._segmentedImages:
-				figure(figsize=(50,50))
-				subplot(lines, 1,i)
-				imshow(self._segmentedImages[img])
+				plt.figure(figsize=(50,50))
+				plt.subplot(lines, 1,i)
+				plt.imshow(self._segmentedImages[img])
 				i+=1
 		else:
 			print('Use debug=True for utilizing this method')
@@ -239,9 +238,9 @@ class GeometricTrack(RobotTracking):
 
 		self._debug = debug
 	def _segmentNaive(self, image):
-		gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+		plt.gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 		image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-		blurred = cv2.GaussianBlur(gray, (5, 5), self.sigma, self.sigma)
+		blurred = cv2.GaussianBlur(plt.gray, (5, 5), self.sigma, self.sigma)
 		thresh = cv2.threshold(blurred, self.binaryThreshold, 255, cv2.THRESH_BINARY)[1]
 		thresh = cv2.bitwise_not(thresh)
 
@@ -338,9 +337,9 @@ class GeometricTrack(RobotTracking):
 			lines = int(len(self._segmentedImage))
 			i=1
 			for img in self._segmentedImage:
-				figure(figsize=(50,50))
-				subplot(lines, 1,i)
-				imshow(img)
+				plt.figure(figsize=(50,50))
+				plt.subplot(lines, 1,i)
+				plt.imshow(img)
 				i+=1
 		else:
 			print('Use debug=True for utilizing this method')
