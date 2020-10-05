@@ -6,6 +6,7 @@ from PIL import Image
 import cv2
 import imutils
 from scipy.ndimage import measurements, morphology
+import time
 
 #https://www.pyimagesearch.com/2016/02/08/opencv-shape-detection/
 
@@ -32,6 +33,7 @@ class RobotTracking(ABC):
 		self._nbr_objects = {}
 		self._pose = {}
 		self._robotID = []
+		self.time = []
 
 	@abstractmethod
 	def track(self,image_name):
@@ -52,11 +54,13 @@ class RobotTracking(ABC):
 		if len(self._pose)>0:
 			return self._pose
 		else:
-			print('There is no poses calculated yet')
+			#print('There is no poses calculated yet')
 			return {}
 
 	def getPoseByID(self, robotID):
 		return self._pose[robotID]
+	def getRobotIDs(self):
+		return self._robotID
 
 	#Define debug functions:
 
@@ -108,12 +112,15 @@ class ColorTrack(RobotTracking):
 		image = self._filterImage(image)
 		labels, nbr_objects = measurements.label(image)
 		center_of_mass = np.array(measurements.center_of_mass(image, labels=labels, index=range(1,nbr_objects+1) ), dtype=float)
-
-		return np.flip(center_of_mass, 1), 1*(labels!=0), nbr_objects
+		if(len(center_of_mass)!=0):
+			return np.flip(center_of_mass, 1), 1*(labels!=0), nbr_objects
+		else:
+			return [], 1*(labels!=0), nbr_objects
 
 
 	def track(self,image_name):
 		image = cv2.imread(image_name)
+		beginning = time.time()
 		self._image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
 		for color in self._colors:
@@ -121,7 +128,8 @@ class ColorTrack(RobotTracking):
 				self._pose[color.name], self._labels[color.name], self._nbr_objects[color.name] = self._trackByColor(image, color)
 			else:
 				self._pose[color.name], _, self._nbr_objects[color.name] = self._trackByColor(image, color)
-
+		end = time.time()
+		self.time.append(end-begining)
 	# debug functions
 	def printLabel(self, nbr):
 		if(self._debug):
@@ -130,9 +138,9 @@ class ColorTrack(RobotTracking):
 			print('Use debug=True for utilizing this method')
 	def printSegmentedImage(self):
 		if(self._debug):
-			lines = int(len(self._segmentedImage))
+			lines = int(len(self._segmentedImages))
 			i=1
-			for img in self._segmentedImage:
+			for img in self._segmentedImages:
 				plt.figure(figsize=(50,50))
 				plt.subplot(lines, 1,i)
 				plt.imshow(img)
@@ -189,10 +197,12 @@ class HoughColorTrack(RobotTracking):
 
 	def track(self,image_name):
 		image = cv2.imread(image_name)
+		beginning = time.time()
 		self._image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 		for color in self._colors:
 			self._pose[color.name], self._nbr_objects[color.name] = self._trackByColorHough(image, color)
-
+		end = time.time()
+		self.time.append(end-begining)
 	#debug functions
 	def printSegmentedImage(self):
 		if(self._debug):
@@ -216,6 +226,8 @@ class GeometricTrack(RobotTracking):
 		self.satTolerance = satTolerance
 		self.sigma = sigma
 		self.segmentMethod = segmentMethod
+		self._robotID = ['triangle', 'square', 'pentagon', 'circle']
+
 		if(segmentMethod=='oneColor'):
 			if type(color) == str:
 				self._color = Colors[color].value
@@ -261,6 +273,7 @@ class GeometricTrack(RobotTracking):
 
 	def track(self, image_name):
 		self._image = cv2.imread(image_name)
+		begining = time.time()
 		resized = imutils.resize(self._image, width=300)
 		self._image = cv2.cvtColor(self._image, cv2.COLOR_BGR2RGB)
 		ratio = self._image.shape[0] / float(resized.shape[0])
@@ -286,7 +299,8 @@ class GeometricTrack(RobotTracking):
 				self._segmentedImage.append(thresh)
 			self._pose = {}
 			self._getPose(thresh, ratio)
-
+		end = time.time()
+		self.time.append(end-begining)
 
 
 	def _getPose(self, thresh, ratio, shapeToTrack = ''):
@@ -307,7 +321,6 @@ class GeometricTrack(RobotTracking):
 						self._pose[shape].append([cX, cY])
 						self._nbr_objects[shape] += 1
 					else:
-						self._robotID.append(shape)
 						self._nbr_objects[shape] = 1
 						self._pose[shape] = [[cX, cY]]
 	def _detect(self, c):
