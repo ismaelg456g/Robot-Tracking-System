@@ -129,7 +129,7 @@ class ColorTrack(RobotTracking):
 			else:
 				self._pose[color.name], _, self._nbr_objects[color.name] = self._trackByColor(image, color)
 		end = time.time()
-		self.time.append(end-begining)
+		self.time.append(end-beginning)
 	# debug functions
 	def printLabel(self, nbr):
 		if(self._debug):
@@ -202,7 +202,7 @@ class HoughColorTrack(RobotTracking):
 		for color in self._colors:
 			self._pose[color.name], self._nbr_objects[color.name] = self._trackByColorHough(image, color)
 		end = time.time()
-		self.time.append(end-begining)
+		self.time.append(end-beginning)
 	#debug functions
 	def printSegmentedImage(self):
 		if(self._debug):
@@ -273,7 +273,7 @@ class GeometricTrack(RobotTracking):
 
 	def track(self, image_name):
 		self._image = cv2.imread(image_name)
-		begining = time.time()
+		beginning = time.time()
 		resized = imutils.resize(self._image, width=300)
 		self._image = cv2.cvtColor(self._image, cv2.COLOR_BGR2RGB)
 		ratio = self._image.shape[0] / float(resized.shape[0])
@@ -300,7 +300,7 @@ class GeometricTrack(RobotTracking):
 			self._pose = {}
 			self._getPose(thresh, ratio)
 		end = time.time()
-		self.time.append(end-begining)
+		self.time.append(end-beginning)
 
 
 	def _getPose(self, thresh, ratio, shapeToTrack = ''):
