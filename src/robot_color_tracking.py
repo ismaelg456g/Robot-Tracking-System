@@ -318,11 +318,11 @@ class GeometricTrack(RobotTracking):
 				shape = self._detect(c)
 				if(shape == shapeToTrack or shapeToTrack==''):
 					if shape in self._pose:
-						self._pose[shape].append([cX, cY])
+						self._pose[shape].append(np.array([cX, cY]))
 						self._nbr_objects[shape] += 1
 					else:
 						self._nbr_objects[shape] = 1
-						self._pose[shape] = [[cX, cY]]
+						self._pose[shape] = [np.array([cX, cY])]
 	def _detect(self, c):
 		# initialize the shape name and approximate the contour
 		shape = "unidentified"
