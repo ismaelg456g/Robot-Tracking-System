@@ -84,7 +84,7 @@ class ColorTrack(RobotTracking):
 				break
 
 		self._labels = {}
-		self._segmentedImages = {}
+		self.segmentedImages = {}
 
 	def _segmentColor(self,image, color):
 		image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -108,7 +108,7 @@ class ColorTrack(RobotTracking):
 	def _trackByColor(self,image, color):
 		image = self._segmentColor(image, color.value)
 		if(self._debug):
-			self._segmentedImages[color.name] = image
+			self.segmentedImages[color.name] = image
 		image = self._filterImage(image)
 		labels, nbr_objects = measurements.label(image)
 		center_of_mass = np.array(measurements.center_of_mass(image, labels=labels, index=range(1,nbr_objects+1) ), dtype=float)
@@ -121,13 +121,18 @@ class ColorTrack(RobotTracking):
 	def track(self,image_name):
 		image = cv2.imread(image_name)
 		beginning = time.time()
+		resized = imutils.resize(image, width=300)
 		self._image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
+		ratio = self._image.shape[0] / float(resized.shape[0])
 		for color in self._colors:
 			if(self._debug):
-				self._pose[color.name], self._labels[color.name], self._nbr_objects[color.name] = self._trackByColor(image, color)
+				self._pose[color.name], self._labels[color.name], self._nbr_objects[color.name] = self._trackByColor(resized, color)
+				if(len(self._pose[color.name])!=0):
+					self._pose[color.name]*=ratio
 			else:
-				self._pose[color.name], _, self._nbr_objects[color.name] = self._trackByColor(image, color)
+				self._pose[color.name], _, self._nbr_objects[color.name] = self._trackByColor(resized, color)
+				if(len(self._pose[color.name])!=0):
+					self._pose[color.name]*=ratio
 		end = time.time()
 		self.time.append(end-beginning)
 	# debug functions
@@ -138,10 +143,12 @@ class ColorTrack(RobotTracking):
 			print('Use debug=True for utilizing this method')
 	def printSegmentedImage(self):
 		if(self._debug):
-			lines = int(len(self._segmentedImages))
+			lines = int(len(self.segmentedImages))
 			i=1
-			for img in self._segmentedImages:
+
+			for img in self.segmentedImages:
 				plt.figure(figsize=(50,50))
+				plt.gray()
 				plt.subplot(lines, 1,i)
 				plt.imshow(img)
 				i+=1
@@ -149,8 +156,12 @@ class ColorTrack(RobotTracking):
 			print('Use debug=True for utilizing this method')
 
 class HoughColorTrack(RobotTracking):
-	def __init__(self, nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60, debug = False):
+	def __init__(self, nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60,param1=30, param2=20, minRadius=100, maxRadius=500, debug = False):
 		super().__init__()
+		self.param1=param1
+		self.param2=param2
+		self.minRadius=minRadius
+		self.maxRadius=maxRadius
 
 		self.binaryThreshold= binaryThreshold
 		self.hueTolerance = hueTolerance
@@ -167,7 +178,7 @@ class HoughColorTrack(RobotTracking):
 			if i >= nbr_colors:
 				break
 
-		self._segmentedImages = {}
+		self.segmentedImages = {}
 	def _segmentColor(self,image, color):
 		image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 		if color == 0:
@@ -183,10 +194,10 @@ class HoughColorTrack(RobotTracking):
 	def _trackByColorHough(self, image, color):
 		image = self._segmentColor(image, color.value)
 		if(self._debug):
-			self._segmentedImages[color.name] = image
-		image = cv2.medianBlur(image, 5)
+			self.segmentedImages[color.name] = image
+		#image = cv2.medianBlur(image, 5)
 		rows = image.shape[0]
-		circles = cv2.HoughCircles(image, cv2.HOUGH_GRADIENT, 1, rows / 8, param1=30, param2=20, minRadius=100, maxRadius=500)
+		circles = cv2.HoughCircles(image, cv2.HOUGH_GRADIENT, 1, rows / 8, param1=self.param1, param2=self.param2, minRadius=self.minRadius, maxRadius=self.maxRadius)
 		if type(circles) == type(None):
 			circles = np.array([[[]]])
 		#print(color.name)
@@ -198,20 +209,25 @@ class HoughColorTrack(RobotTracking):
 	def track(self,image_name):
 		image = cv2.imread(image_name)
 		beginning = time.time()
+		resized = imutils.resize(image, width=300)
 		self._image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+		ratio = self._image.shape[0] / float(resized.shape[0])
 		for color in self._colors:
-			self._pose[color.name], self._nbr_objects[color.name] = self._trackByColorHough(image, color)
+			self._pose[color.name], self._nbr_objects[color.name] = self._trackByColorHough(resized, color)
+			if(len(self._pose[color.name])!=0):
+				self._pose[color.name]*=ratio
 		end = time.time()
 		self.time.append(end-beginning)
 	#debug functions
 	def printSegmentedImage(self):
 		if(self._debug):
-			lines = int(len(self._segmentedImages))
+			lines = int(len(self.segmentedImages))
 			i=1
-			for img in self._segmentedImages:
+			for img in self.segmentedImages:
 				plt.figure(figsize=(50,50))
+				plt.gray()
 				plt.subplot(lines, 1,i)
-				plt.imshow(self._segmentedImages[img])
+				plt.imshow(self.segmentedImages[img])
 				i+=1
 		else:
 			print('Use debug=True for utilizing this method')
