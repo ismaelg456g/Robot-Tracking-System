@@ -47,7 +47,7 @@ class RobotTracking(ABC):
 		for robotID in self._robotID:
 			for i in range(self._nbr_objects[robotID]):
 				if self._pose[robotID][i].shape[0] == 2 :
-					plt.text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID, color='white', horizontalalignment='center',verticalalignment='center')
+					plt.text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID, color='black', horizontalalignment='center',verticalalignment='center')
 
 
 	def getPoses(self):
@@ -65,7 +65,7 @@ class RobotTracking(ABC):
 	#Define debug functions:
 
 class ColorTrack(RobotTracking):
-	def __init__(self,nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60, kernel=np.ones((20,20)), debug = False):
+	def __init__(self,colors = [],nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60, kernel=np.ones((20,20)), debug = False):
 		super().__init__()
 
 		self.binaryThreshold= binaryThreshold
@@ -73,15 +73,19 @@ class ColorTrack(RobotTracking):
 		self.satTolerance = satTolerance
 		self.kernel = kernel
 		self._debug = debug
-
 		self._colors = []
-		i = 0
-		for color in Colors:
-			self._robotID.append(color.name)
-			self._colors.append(color)
-			i+=1
-			if i >= nbr_colors:
-				break
+		if(len(colors)==0):
+			i = 0
+			for color in Colors:
+				self._robotID.append(color.name)
+				self._colors.append(color)
+				i+=1
+				if i >= nbr_colors:
+					break
+		else:
+			for c in colors:
+				self._robotID.append(c)
+				self._colors.append(Colors[c])
 
 		self._labels = {}
 		self.segmentedImages = {}
@@ -145,7 +149,7 @@ class ColorTrack(RobotTracking):
 		if(self._debug):
 			lines = int(len(self.segmentedImages))
 			i=1
-
+			print(self.segmentedImages)
 			for img in self.segmentedImages:
 				plt.figure(figsize=(50,50))
 				plt.gray()
@@ -372,3 +376,8 @@ class GeometricTrack(RobotTracking):
 				i+=1
 		else:
 			print('Use debug=True for utilizing this method')
+
+class LedTrack(ColorTrack):
+	def __init__():
+		super().__init__()
+		self.satTolerance = 255
