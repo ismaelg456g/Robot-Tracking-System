@@ -27,8 +27,8 @@ class Colors(Enum):
 	pink = 165
 
 class RobotTracking(ABC):
-	def __init__(self):
-
+	def __init__(self, img_width=300):
+		self.img_width = img_width;
 		self._image = None
 		self._nbr_objects = {}
 		self._pose = {}
@@ -65,8 +65,8 @@ class RobotTracking(ABC):
 	#Define debug functions:
 
 class ColorTrack(RobotTracking):
-	def __init__(self,colors = [],nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60, kernel=np.ones((20,20)), debug = False):
-		super().__init__()
+	def __init__(self,img_width=300,colors = [],nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60, kernel=np.ones((20,20)), debug = False):
+		super().__init__(img_width)
 
 		self.binaryThreshold= binaryThreshold
 		self.hueTolerance = hueTolerance
@@ -125,7 +125,7 @@ class ColorTrack(RobotTracking):
 	def track(self,image_name):
 		image = cv2.imread(image_name)
 		beginning = time.time()
-		resized = imutils.resize(image, width=300)
+		resized = imutils.resize(image, width=self.img_width)
 		self._image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 		ratio = self._image.shape[0] / float(resized.shape[0])
 		for color in self._colors:
@@ -160,8 +160,8 @@ class ColorTrack(RobotTracking):
 			print('Use debug=True for utilizing this method')
 
 class HoughColorTrack(RobotTracking):
-	def __init__(self, nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60,param1=30, param2=20, minRadius=100, maxRadius=500, debug = False):
-		super().__init__()
+	def __init__(self,img_width=300, nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60,param1=30, param2=20, minRadius=100, maxRadius=500, debug = False):
+		super().__init__(img_width)
 		self.param1=param1
 		self.param2=param2
 		self.minRadius=minRadius
@@ -213,7 +213,7 @@ class HoughColorTrack(RobotTracking):
 	def track(self,image_name):
 		image = cv2.imread(image_name)
 		beginning = time.time()
-		resized = imutils.resize(image, width=300)
+		resized = imutils.resize(image, width=self.img_width)
 		self._image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 		ratio = self._image.shape[0] / float(resized.shape[0])
 		for color in self._colors:
@@ -238,8 +238,8 @@ class HoughColorTrack(RobotTracking):
 
 
 class GeometricTrack(RobotTracking):
-	def __init__(self, areaBounds = (500.0, 20000.0), binaryThreshold = 140, sigma = 3, segmentMethod = 'simple', color = 'green', hueTolerance = 12, satTolerance = 60, debug = False):
-		super().__init__()
+	def __init__(self,img_width=300, areaBounds = (500.0, 20000.0), binaryThreshold = 140, sigma = 3, segmentMethod = 'simple', color = 'green', hueTolerance = 12, satTolerance = 60, debug = False):
+		super().__init__(img_width)
 		self.areaBounds = areaBounds
 		self.binaryThreshold = binaryThreshold
 		self.hueTolerance = hueTolerance
@@ -294,7 +294,7 @@ class GeometricTrack(RobotTracking):
 	def track(self, image_name):
 		self._image = cv2.imread(image_name)
 		beginning = time.time()
-		resized = imutils.resize(self._image, width=300)
+		resized = imutils.resize(self._image, width=self.img_width)
 		self._image = cv2.cvtColor(self._image, cv2.COLOR_BGR2RGB)
 		ratio = self._image.shape[0] / float(resized.shape[0])
 		if self.segmentMethod == 'oneColor':
