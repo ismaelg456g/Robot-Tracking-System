@@ -47,7 +47,7 @@ class RobotTracking(ABC):
 		for robotID in self._robotID:
 			for i in range(self._nbr_objects[robotID]):
 				if self._pose[robotID][i].shape[0] == 2 :
-					plt.text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID, color='black', horizontalalignment='center',verticalalignment='center')
+					plt.text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID, color='white', horizontalalignment='center',verticalalignment='center')
 
 
 	def getPoses(self):
@@ -111,9 +111,10 @@ class ColorTrack(RobotTracking):
 
 	def _trackByColor(self,image, color):
 		image = self._segmentColor(image, color.value)
+		
+		image = self._filterImage(image)
 		if(self._debug):
 			self.segmentedImages[color.name] = image
-		image = self._filterImage(image)
 		labels, nbr_objects = measurements.label(image)
 		center_of_mass = np.array(measurements.center_of_mass(image, labels=labels, index=range(1,nbr_objects+1) ), dtype=float)
 		if(len(center_of_mass)!=0):
@@ -378,6 +379,27 @@ class GeometricTrack(RobotTracking):
 			print('Use debug=True for utilizing this method')
 
 class LedTrack(ColorTrack):
-	def __init__():
+	def __init__(self):
 		super().__init__()
 		self.satTolerance = 255
+class AchromaticTrack(ColorTrack):
+	def _segmentColor(self,image, color):
+		d=30
+
+		rgb = image[:,:,0].astype(float) + image[:,:,1].astype(float) + image[:,:,2].astype(float)
+		im_new = image.astype(float)
+
+		red = im_new[:,:,0] = 255*im_new[:,:,0]/rgb
+		green = im_new[:,:,1] = 255*im_new[:,:,1]/rgb
+		blue = im_new[:,:,2] = 255*im_new[:,:,2]/rgb
+
+		
+		cad = (np.abs(red-green)+np.abs(green-blue)+np.abs(blue-red))/(3*d)
+		im_new = im_new.astype(np.uint8)
+		cad = (cad>1)
+		im_new[:,:,0] = im_new[:,:,0]*cad
+		im_new[:,:,2] = im_new[:,:,2]*cad
+		im_new[:,:,1] = im_new[:,:,1]*cad
+		image = cv2.cvtColor(im_new, cv2.COLOR_RGB2GRAY)
+
+		return image
