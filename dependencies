@@ -1,2 +1,5 @@
 pip3 install opencv-python
 pip install imutils
+conda install pycairo
+pip install PyGobject
+

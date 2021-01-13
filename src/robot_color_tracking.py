@@ -383,8 +383,11 @@ class LedTrack(ColorTrack):
 		super().__init__()
 		self.satTolerance = 255
 class AchromaticTrack(ColorTrack):
+	def __init__(self,img_width=300,colors = [],nbr_colors = 3, binaryThreshold = 30, hueTolerance = 30, satTolerance = 0, kernel=np.ones((20,20)), debug = False, d=30):
+		super().__init__(img_width,colors,nbr_colors, binaryThreshold, hueTolerance, satTolerance, kernel, debug)
+		self.d = d
 	def _segmentColor(self,image, color):
-		d=30
+		d= self.d
 
 		rgb = image[:,:,0].astype(float) + image[:,:,1].astype(float) + image[:,:,2].astype(float)
 		im_new = image.astype(float)
@@ -400,6 +403,47 @@ class AchromaticTrack(ColorTrack):
 		im_new[:,:,0] = im_new[:,:,0]*cad
 		im_new[:,:,2] = im_new[:,:,2]*cad
 		im_new[:,:,1] = im_new[:,:,1]*cad
-		image = cv2.cvtColor(im_new, cv2.COLOR_RGB2GRAY)
+
+		# image = cv2.cvtColor(im_new, cv2.COLOR_RGB2GRAY)
+		image = cv2.cvtColor(im_new, cv2.COLOR_BGR2HSV)
+		if color == 0:
+			image[:,:,2] = (image[:,:,0] >= 180-self.hueTolerance) * image[:,:,2] + (image[:,:,0] < 0+self.hueTolerance) * image[:,:,2]
+		else:
+			image[:,:,2] = (image[:,:,0] >= color - self.hueTolerance) * image[:,:,2]
+			image[:,:,2] = (image[:,:,0] < color + self.hueTolerance) * image[:,:,2]
+		image[:,:,2] = (image[:,:,1] > self.satTolerance) * image[:,:,2]
+		image = cv2.cvtColor(cv2.cvtColor(image, cv2.COLOR_HSV2BGR),cv2.COLOR_BGR2GRAY)
+
+		return image
+
+class SignColorTrack(ColorTrack):
+	def __init__(self,img_width=300,colors = [],nbr_colors = 3, binaryThreshold = 30, hueTolerance = 30, satTolerance = 0, kernel=np.ones((20,20)), debug = False):
+		super().__init__()
+	def _segmentColor(self,image, color):
+		d=50 #30 is the article standard
+
+		rgb = image[:,:,0].astype(float) + image[:,:,1].astype(float) + image[:,:,2].astype(float)
+		im_new = image.astype(float)
+
+		red = im_new[:,:,0] = 255*im_new[:,:,0]/rgb
+		green = im_new[:,:,1] = 255*im_new[:,:,1]/rgb
+		blue = im_new[:,:,2] = 255*im_new[:,:,2]/rgb
+
+		
+		cad = (np.abs(red-green)+np.abs(green-blue)+np.abs(blue-red))/(3*d)
+		im_new = im_new.astype(np.uint8)
+		cad = (cad>1)
+		im_new[:,:,0] = im_new[:,:,0]*cad
+		im_new[:,:,2] = im_new[:,:,2]*cad
+		im_new[:,:,1] = im_new[:,:,1]*cad
+
+		image = cv2.cvtColor(im_new, cv2.COLOR_BGR2HSV)
+		if color == 0:
+			image[:,:,2] = (image[:,:,0] >= 180-self.hueTolerance) * image[:,:,2] + (image[:,:,0] < 0+self.hueTolerance) * image[:,:,2]
+		else:
+			image[:,:,2] = (image[:,:,0] >= color - self.hueTolerance) * image[:,:,2]
+			image[:,:,2] = (image[:,:,0] < color + self.hueTolerance) * image[:,:,2]
+		image[:,:,2] = (image[:,:,1] > self.satTolerance) * image[:,:,2]
+		image = cv2.cvtColor(cv2.cvtColor(image, cv2.COLOR_HSV2BGR),cv2.COLOR_BGR2GRAY)
 
 		return image
