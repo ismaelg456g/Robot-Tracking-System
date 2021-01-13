@@ -1,4 +1,4 @@
 printedError.txt
 img/*
-.ipnb_checkpoints/
-__pycache__/
+src/.ipnb_checkpoints/
+src/__pycache__/
