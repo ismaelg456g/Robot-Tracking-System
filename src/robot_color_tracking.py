@@ -161,7 +161,7 @@ class ColorTrack(RobotTracking):
 			print('Use debug=True for utilizing this method')
 
 class HoughColorTrack(RobotTracking):
-	def __init__(self,img_width=300, nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60,param1=30, param2=20, minRadius=100, maxRadius=500, debug = False):
+	def __init__(self,img_width=300,colors = [], nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60,param1=30, param2=20, minRadius=100, maxRadius=500, debug = False):
 		super().__init__(img_width)
 		self.param1=param1
 		self.param2=param2
@@ -176,12 +176,19 @@ class HoughColorTrack(RobotTracking):
 
 		self._colors = []
 		i = 0
-		for color in Colors:
-			self._robotID.append(color.name)
-			self._colors.append(color)
-			i+=1
-			if i >= nbr_colors:
-				break
+		self._colors = []
+		if(len(colors)==0):
+			i = 0
+			for color in Colors:
+				self._robotID.append(color.name)
+				self._colors.append(color)
+				i+=1
+				if i >= nbr_colors:
+					break
+		else:
+			for c in colors:
+				self._robotID.append(c)
+				self._colors.append(Colors[c])
 
 		self.segmentedImages = {}
 	def _segmentColor(self,image, color):
