@@ -390,9 +390,10 @@ class LedTrack(ColorTrack):
 		super().__init__()
 		self.satTolerance = 255
 class AchromaticTrack(ColorTrack):
-	def __init__(self,img_width=300,colors = [],nbr_colors = 3, binaryThreshold = 30, hueTolerance = 30, satTolerance = 0, kernel=np.ones((20,20)), debug = False, d=30):
+	def __init__(self,convolution=True,img_width=300,colors = [],nbr_colors = 3, binaryThreshold = 30, hueTolerance = 30, satTolerance = 0, kernel=np.ones((20,20)), debug = False, d=30):
 		super().__init__(img_width,colors,nbr_colors, binaryThreshold, hueTolerance, satTolerance, kernel, debug)
 		self.d = d
+		self.convolution = convolution
 	def _segmentColor(self,image, color):
 		d= self.d
 
@@ -422,6 +423,16 @@ class AchromaticTrack(ColorTrack):
 		image = cv2.cvtColor(cv2.cvtColor(image, cv2.COLOR_HSV2BGR),cv2.COLOR_BGR2GRAY)
 
 		return image
+	def  _filterImage(self,image):
+		image = 1*(image>self.binaryThreshold)
+		if(self.convolution):
+			im_open = morphology.binary_opening(image, self.kernel, iterations=1)
+			im_closed = morphology.binary_closing(im_open, self.kernel)
+			return im_closed
+		else:
+			return image
+
+		
 
 class SignColorTrack(ColorTrack):
 	def __init__(self,img_width=300,colors = [],nbr_colors = 3, binaryThreshold = 30, hueTolerance = 30, satTolerance = 0, kernel=np.ones((20,20)), debug = False):
