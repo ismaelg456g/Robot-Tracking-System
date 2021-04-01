@@ -5,6 +5,7 @@ import robot_color_tracking as track
 #TODO: Resolve get_statistics in evaluate_error
 #TODO: Better solution for id_options
 #TODO: False Positives by ID
+#TODO: Better interchange of databases
 
 # Estatisticas
 
@@ -26,18 +27,18 @@ class Tester(object):
                 if m == 'shapes':
                     self.trackers[m] = track.GeometricTrack(binaryThreshold= 140, segmentMethod='simple')
                 elif m == 'colors_naive':
-                    self.trackers[m] = track.ColorTrack(img_width=500,satTolerance= 110,binaryThreshold = 60, hueTolerance = 15,kernel = ((0,1,0),(1,1,1),(0,1,0)), colors=['cyan', 'red', 'yellow'], debug=True)
-                    id_options = ['green', 'red', 'yellow']
+                    self.trackers[m] = track.ColorTrack(img_width=500,satTolerance= 110,binaryThreshold = 60, hueTolerance = 15,kernel = ((0,1,0),(1,1,1),(0,1,0)), colors=id_options, debug=True)
+                    # id_options = ['blue','green', 'red', 'yellow']
                 elif m == 'shapes_colors':
                     self.trackers[m] = track.GeometricTrack(areaBounds = (200, 20000),binaryThreshold= 70, segmentMethod='multipleColors', color=['red', 'yellow', 'blue', 'green'])
                 elif m == 'hough_colors':
-                    self.trackers[m] = track.HoughColorTrack(img_width=500,satTolerance= 110,binaryThreshold = 80, hueTolerance = 20,param1=30, param2=10, minRadius=1, maxRadius=500, debug=True, colors=['cyan', 'red', 'yellow'])
-                    id_options = ['green', 'red', 'yellow']
+                    self.trackers[m] = track.HoughColorTrack(img_width=500,satTolerance= 110,binaryThreshold = 80, hueTolerance = 20,param1=30, param2=10, minRadius=1, maxRadius=500, debug=True, colors=id_options)
+                    # id_options = ['blue','green', 'red', 'yellow']
                 elif m == 'shapes_one_color':
                     self.trackers[m] = track.GeometricTrack(areaBounds = (200, 20000),binaryThreshold= 70, segmentMethod='oneColor',color='red')
                 elif m == 'achromatic':
-                    self.trackers[m] = track.AchromaticTrack(d=30,img_width=500, binaryThreshold= 40, hueTolerance=15, satTolerance=0, kernel = np.ones((3,3)),colors=['cyan', 'red', 'yellow'], debug=True)
-                    id_options = [ 'green', 'red', 'yellow']
+                    self.trackers[m] = track.AchromaticTrack(d=30,img_width=500, binaryThreshold= 40, hueTolerance=15, satTolerance=0, kernel = np.ones((3,3)),colors=id_options, debug=True)
+                    # id_options = ['blue', 'green', 'red', 'yellow']
                 else:
                     raise Exception(m+' is not recognized as a method of tracking')
 
@@ -80,9 +81,9 @@ class Tester(object):
                 self.trackers[m].track(path+image)
                 calc_poses = self.trackers[m].getPoses()
                 actual_poses = data[image]["position"]
-                if m == 'achromatic' or 'colors_naive' or 'hough_colors':
-                    calc_poses['green'] = calc_poses['cyan']
-                    del(calc_poses['cyan'])
+                # if m == 'achromatic' or 'colors_naive' or 'hough_colors':
+                #     calc_poses['green'] = calc_poses['cyan']
+                #     del(calc_poses['cyan'])
                 
                 for id_name in self.id_options:
                     if id_name in actual_poses:
@@ -158,14 +159,18 @@ class Tester(object):
         print("Statistics calculated")
 
         return self.statistics
-    def get_statistics_by_id(self):
+    def get_statistics_by_id(self, pos_data = None, err = None):
+        if(pos_data == None):
+            pos_data = self.positions_data
+        if(err == None):
+            err = self.error
         for m in self.methods:
             self.statistics[m] = {}
             self.statistics[m]['time'] = np.array(self.timeOfTrack[m]).mean()
             for robot_id in self.id_options:
                 self.statistics[m][robot_id] = {}
-                id_imgs = self.filter_id(self.error[m], robot_id)
-                real_positions_filtered = self.filter_id(self.positions_data[m], robot_id)
+                id_imgs = self.filter_id(err[m], robot_id)
+                real_positions_filtered = self.filter_id(pos_data[m], robot_id)
                 positions = np.array(self.get_only_error_id(id_imgs,robot_id))
 
                 total = self.statistics[m][robot_id]['total_positions'] = self.get_total_positions_id(real_positions_filtered, robot_id)
@@ -182,13 +187,13 @@ class Tester(object):
     def filter_id(self, data, robot_id):
         filtered_data = {}
         for img in data:
-            if(data[img]['place']!='night right bulb' and data[img]['place']!='night left bulb' ):
-                if('position_error' in data[img]):
-                    if robot_id in data[img]['position_error']:
-                        filtered_data[img] = data[img]
-                else:
-                    if robot_id in data[img]['position']:
-                        filtered_data[img] = data[img]
+            # if(data[img]['place']!='night right bulb' and data[img]['place']!='night left bulb' ):
+            if('position_error' in data[img]):
+                if robot_id in data[img]['position_error']:
+                    filtered_data[img] = data[img]
+            else:
+                if robot_id in data[img]['position']:
+                    filtered_data[img] = data[img]
 
         return filtered_data
     def filter_place(self,data, place):
@@ -196,6 +201,15 @@ class Tester(object):
         for img in data:
             if data[img]['place'] == place:
                 filtered_data[img] = data[img]
+        
+        return filtered_data
+    def filter_place_methods(self,data, place):
+        filtered_data = {}
+        for m in self.methods:
+            filtered_data[m] = {}
+            for img in data[m]:
+                if data[m][img]['place'] == place:
+                    filtered_data[m][img] = data[m][img]
         
         return filtered_data
     def get_only_error_id(self,filtered_id, robot_id):

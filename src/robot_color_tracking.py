@@ -6,6 +6,7 @@ from PIL import Image
 import cv2
 import imutils
 from scipy.ndimage import measurements, morphology
+from scipy.ndimage import gaussian_filter
 import time
 
 #https://www.pyimagesearch.com/2016/02/08/opencv-shape-detection/
@@ -28,10 +29,11 @@ class Colors(Enum):
 
 class RobotTracking(ABC):
 	def __init__(self, img_width=300):
-		self.img_width = img_width;
+		self.img_width = img_width
 		self._image = None
 		self._nbr_objects = {}
 		self._pose = {}
+		self.angle = {}
 		self._robotID = []
 		self.time = []
 
@@ -61,6 +63,33 @@ class RobotTracking(ABC):
 		return self._pose[robotID]
 	def getRobotIDs(self):
 		return self._robotID
+	def getAngle(self, poses):
+		poses2 = np.array([poses[1],poses[2],poses[0]])
+		dist = ((poses - poses2)**2).sum(axis=1)**(0.5)
+		print('poses: '+ str(poses))
+		print('poses2: '+ str(poses2))
+		print('dist: '+ str(dist))
+		p1 = np.delete(poses, dist.argmin()-1, 0)
+		p1 = p1.sum(axis=0)/2
+
+		p2 = poses[dist.argmin()-1]
+		print('p1: '+ str(p1))
+		print('p2: '+ str(p2))
+
+		sub = (p2-p1)*(1,-1)
+		print('sub: '+ str(sub))
+		angle = np.arctan(sub[1]/sub[0])*360/(2*np.pi)
+		if(sub[0]<0 and sub[1]> 0):
+			angle+= 180
+		elif(sub[0]<0 and sub[1]< 0):
+			angle-= 180
+
+
+
+		return angle
+
+
+
 
 	#Define debug functions:
 
@@ -113,20 +142,60 @@ class ColorTrack(RobotTracking):
 		image = self._segmentColor(image, color.value)
 		
 		image = self._filterImage(image)
+		
+
+		
+		while True:
+			labels, nbr_objects = measurements.label(image)
+			areas = measurements.sum(image, labels=labels, index=range(1,nbr_objects+1) )
+			if(areas.max()>100):
+				image = morphology.binary_erosion(image)
+			else:
+				break
 		if(self._debug):
 			self.segmentedImages[color.name] = image
-		labels, nbr_objects = measurements.label(image)
+		
 		center_of_mass = np.array(measurements.center_of_mass(image, labels=labels, index=range(1,nbr_objects+1) ), dtype=float)
 		if(len(center_of_mass)!=0):
 			return np.flip(center_of_mass, 1), 1*(labels!=0), nbr_objects
 		else:
 			return [], 1*(labels!=0), nbr_objects
 
+	def postProcessing(self):
+		distance_matrix = {}
+
+		for c in self._robotID:
+			n_poses = len(self._pose[c])
+			if n_poses > 3:
+				distance_matrix[c] = np.zeros((n_poses, n_poses))
+				# optimize later with c++
+				for i in range(n_poses):
+					for j in range(i+1, n_poses):
+						distance_matrix[c][i,j] = distance_matrix[c][j,i] = ((self._pose[c][i] - self._pose[c][j])**2).sum()**(0.5)
+				distance_sum = distance_matrix[c].sum(axis=1)
+
+				while(len(distance_sum)>3):
+					argmax = distance_sum.argmax()
+					distance_sum = np.delete(distance_sum, argmax, 0)
+					self._pose[c] = np.delete(self._pose[c], argmax, 0)
+					self._nbr_objects[c] -=1
+					# distance_matrix[c] = np.delete(distance_matrix[c], argmax, 0)
+					# distance_matrix[c] = np.delete(distance_matrix[c], argmax, 1)
+			if len(self._pose[c]) == 3:
+				self.angle[c] =  self.getAngle(self._pose[c])
+
+
+
+
+		return distance_matrix
+
+
 
 	def track(self,image_name):
 		image = cv2.imread(image_name)
 		beginning = time.time()
 		resized = imutils.resize(image, width=self.img_width)
+		# resized = cv2.medianBlur(resized, 5)
 		self._image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 		ratio = self._image.shape[0] / float(resized.shape[0])
 		for color in self._colors:
@@ -138,6 +207,7 @@ class ColorTrack(RobotTracking):
 				self._pose[color.name], _, self._nbr_objects[color.name] = self._trackByColor(resized, color)
 				if(len(self._pose[color.name])!=0):
 					self._pose[color.name]*=ratio
+		# self.postProcessing()
 		end = time.time()
 		self.time.append(end-beginning)
 	# debug functions
