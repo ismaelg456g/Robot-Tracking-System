@@ -74,6 +74,7 @@ class Tester(object):
                         'false_negative': {},
                         'false_positive': {},
                         'position_error': {},
+                        'angle_error': {},
                         'place': data[image]['place'],
                         'tags': data[image]['tags'],
                 }
@@ -89,7 +90,12 @@ class Tester(object):
                     if id_name in actual_poses:
                         if id_name in calc_poses:
                             err, false_positive, false_negative = self.calc_dist_error(calc_poses[id_name], actual_poses[id_name])
+                            if(id_name in self.trackers[m].angle and len(actual_poses[id_name])==3):
+                                angle_err = self.calc_angle_error(self.trackers[m].angle[id_name], self.trackers[m].getAngle(actual_poses[id_name]))
+                            else:
+                                angle_err = None
                             self.error[m][image]['position_error'][id_name] = err
+                            self.error[m][image]['angle_error'][id_name] = angle_err
                             self.error[m][image]['false_positive_total'] += false_positive
                             self.error[m][image]['false_positive'][id_name] = false_positive
                             self.error[m][image]['false_negative_total'] += false_negative
@@ -134,8 +140,8 @@ class Tester(object):
         return result, false_positives, false_negatives
 
 
-
-
+    def calc_angle_error(self, calc_angle, actual_angle):
+        return np.abs(calc_angle - actual_angle)
     def get_statistics_by_place(self):
         place_names = ["daylight", "night right bulb", "night center bulb", "night left bulb"]
 
@@ -146,11 +152,14 @@ class Tester(object):
                 self.statistics[m][place] = {}
                 place_imgs = self.filter_place(self.error[m], place)
                 real_positions_filtered = self.filter_place(self.positions_data[m], place)
-                positions = np.array(self.get_only_error(place_imgs))
+                positions, angles = self.get_only_error(place_imgs)
+                positions = np.array(positions)
+                angles = np.array(angles)
 
                 total = self.statistics[m][place]['total_positions'] = self.get_total_positions(real_positions_filtered)
                 self.statistics[m][place]['distance_mean'] = positions.mean()
-                self.statistics[m][place]['distance_deviation'] = positions.var()
+                self.statistics[m][place]['angle_mean'] = angles.mean()
+                self.statistics[m][place]['distance_deviation'] = positions.std()
                 self.statistics[m][place]['detected'] = 100*positions.size/total
                 self.statistics[m][place]['total_img'] = len(place_imgs)
                 self.statistics[m][place]['false_negative'] = 100*self.get_false_negative(place_imgs)/total
@@ -171,11 +180,14 @@ class Tester(object):
                 self.statistics[m][robot_id] = {}
                 id_imgs = self.filter_id(err[m], robot_id)
                 real_positions_filtered = self.filter_id(pos_data[m], robot_id)
-                positions = np.array(self.get_only_error_id(id_imgs,robot_id))
+                positions, angles = self.get_only_error_id(id_imgs,robot_id)
+                positions = np.array(positions)
+                angles = np.array(angles)
 
                 total = self.statistics[m][robot_id]['total_positions'] = self.get_total_positions_id(real_positions_filtered, robot_id)
                 self.statistics[m][robot_id]['distance_mean'] = positions.mean()
-                self.statistics[m][robot_id]['distance_deviation'] = positions.var()
+                self.statistics[m][robot_id]['angle_mean'] = angles.mean()
+                self.statistics[m][robot_id]['distance_deviation'] = positions.std()
                 self.statistics[m][robot_id]['detected'] = 100*positions.size/total
                 self.statistics[m][robot_id]['total_img'] = len(id_imgs)
                 self.statistics[m][robot_id]['false_negative'] = 100*self.get_false_negative_id(id_imgs, real_positions_filtered, robot_id)/total
@@ -214,19 +226,25 @@ class Tester(object):
         return filtered_data
     def get_only_error_id(self,filtered_id, robot_id):
         error_vector = []
+        ang_error_vector = []
         
         for img_name in filtered_id:
-                error_vector = error_vector + filtered_id[img_name]['position_error'][robot_id]
-        
-        return error_vector
+            error_vector = error_vector + filtered_id[img_name]['position_error'][robot_id]
+            if(filtered_id[img_name]['angle_error'][robot_id] != None):
+                ang_error_vector = ang_error_vector + [filtered_id[img_name]['angle_error'][robot_id]]
+
+        return error_vector, ang_error_vector
     def get_only_error(self,filtered_local):
         error_vector = []
-        
+        ang_error_vector = []
+
         for img_name in filtered_local:
             for id_name in filtered_local[img_name]['position_error']:
                 error_vector = error_vector + filtered_local[img_name]['position_error'][id_name]
+                if(filtered_local[img_name]['angle_error'][robot_id] != None):
+                    ang_error_vector = ang_error_vector + [filtered_local[img_name]['angle_error'][robot_id]]
         
-        return error_vector
+        return error_vector, ang_error_vector
     def get_total_positions(self,filtered_local):
         total = 0
         

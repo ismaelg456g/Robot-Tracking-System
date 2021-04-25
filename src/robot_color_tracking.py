@@ -66,18 +66,18 @@ class RobotTracking(ABC):
 	def getAngle(self, poses):
 		poses2 = np.array([poses[1],poses[2],poses[0]])
 		dist = ((poses - poses2)**2).sum(axis=1)**(0.5)
-		print('poses: '+ str(poses))
-		print('poses2: '+ str(poses2))
-		print('dist: '+ str(dist))
+		# print('poses: '+ str(poses))
+		# print('poses2: '+ str(poses2))
+		# print('dist: '+ str(dist))
 		p1 = np.delete(poses, dist.argmin()-1, 0)
 		p1 = p1.sum(axis=0)/2
 
 		p2 = poses[dist.argmin()-1]
-		print('p1: '+ str(p1))
-		print('p2: '+ str(p2))
+		# print('p1: '+ str(p1))
+		# print('p2: '+ str(p2))
 
 		sub = (p2-p1)*(1,-1)
-		print('sub: '+ str(sub))
+		# print('sub: '+ str(sub))
 		angle = np.arctan(sub[1]/sub[0])*360/(2*np.pi)
 		if(sub[0]<0 and sub[1]> 0):
 			angle+= 180
@@ -94,7 +94,7 @@ class RobotTracking(ABC):
 	#Define debug functions:
 
 class ColorTrack(RobotTracking):
-	def __init__(self,img_width=300,colors = [],nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60, kernel=np.ones((20,20)), debug = False):
+	def __init__(self,elimination=False,post_erosion=False,img_width=300,colors = [],nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60, kernel=np.ones((20,20)), debug = False):
 		super().__init__(img_width)
 
 		self.binaryThreshold= binaryThreshold
@@ -103,6 +103,9 @@ class ColorTrack(RobotTracking):
 		self.kernel = kernel
 		self._debug = debug
 		self._colors = []
+		self.post_erosion = post_erosion
+		self.elimination = elimination
+
 		if(len(colors)==0):
 			i = 0
 			for color in Colors:
@@ -144,16 +147,21 @@ class ColorTrack(RobotTracking):
 		image = self._filterImage(image)
 		
 
-		
-		while True:
+		if(self.post_erosion):
+			while True:
+				labels, nbr_objects = measurements.label(image)
+				areas = measurements.sum(image, labels=labels, index=range(1,nbr_objects+1) )
+				if(len(areas) > 0):
+					if(areas.max()>100):
+						image = morphology.binary_erosion(image)
+					else:
+						break
+				else:
+					break
+			if(self._debug):
+				self.segmentedImages[color.name] = image
+		else:
 			labels, nbr_objects = measurements.label(image)
-			areas = measurements.sum(image, labels=labels, index=range(1,nbr_objects+1) )
-			if(areas.max()>100):
-				image = morphology.binary_erosion(image)
-			else:
-				break
-		if(self._debug):
-			self.segmentedImages[color.name] = image
 		
 		center_of_mass = np.array(measurements.center_of_mass(image, labels=labels, index=range(1,nbr_objects+1) ), dtype=float)
 		if(len(center_of_mass)!=0):
@@ -184,9 +192,6 @@ class ColorTrack(RobotTracking):
 			if len(self._pose[c]) == 3:
 				self.angle[c] =  self.getAngle(self._pose[c])
 
-
-
-
 		return distance_matrix
 
 
@@ -207,7 +212,8 @@ class ColorTrack(RobotTracking):
 				self._pose[color.name], _, self._nbr_objects[color.name] = self._trackByColor(resized, color)
 				if(len(self._pose[color.name])!=0):
 					self._pose[color.name]*=ratio
-		# self.postProcessing()
+		if(self.elimination):
+			self.postProcessing()
 		end = time.time()
 		self.time.append(end-beginning)
 	# debug functions
@@ -232,7 +238,7 @@ class ColorTrack(RobotTracking):
 
 class HoughColorTrack(RobotTracking):
 	def __init__(self,img_width=300,colors = [], nbr_colors = 3, binaryThreshold = 110, hueTolerance = 7, satTolerance = 60,param1=30, param2=20, minRadius=100, maxRadius=500, debug = False):
-		super().__init__(img_width)
+		super().__init__(img_width=img_width)
 		self.param1=param1
 		self.param2=param2
 		self.minRadius=minRadius
@@ -460,8 +466,8 @@ class LedTrack(ColorTrack):
 		super().__init__()
 		self.satTolerance = 255
 class AchromaticTrack(ColorTrack):
-	def __init__(self,convolution=True,img_width=300,colors = [],nbr_colors = 3, binaryThreshold = 30, hueTolerance = 30, satTolerance = 0, kernel=np.ones((20,20)), debug = False, d=30):
-		super().__init__(img_width,colors,nbr_colors, binaryThreshold, hueTolerance, satTolerance, kernel, debug)
+	def __init__(self,elimination=False,post_erosion=False,convolution=True,img_width=300,colors = [],nbr_colors = 3, binaryThreshold = 30, hueTolerance = 30, satTolerance = 0, kernel=np.ones((20,20)), debug = False, d=30):
+		super().__init__(elimination, post_erosion,img_width,colors,nbr_colors, binaryThreshold, hueTolerance, satTolerance, kernel, debug)
 		self.d = d
 		self.convolution = convolution
 	def _segmentColor(self,image, color):
@@ -501,8 +507,6 @@ class AchromaticTrack(ColorTrack):
 			return im_closed
 		else:
 			return image
-
-		
 
 class SignColorTrack(ColorTrack):
 	def __init__(self,img_width=300,colors = [],nbr_colors = 3, binaryThreshold = 30, hueTolerance = 30, satTolerance = 0, kernel=np.ones((20,20)), debug = False):
