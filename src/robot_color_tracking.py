@@ -1,9 +1,11 @@
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import numpy as np
 from abc import ABC, abstractmethod
 from enum import Enum
 from PIL import Image
 import cv2
+import cv2.aruco as aruco
 import imutils
 from scipy.ndimage import measurements, morphology
 from scipy.ndimage import gaussian_filter
@@ -49,7 +51,7 @@ class RobotTracking(ABC):
 		for robotID in self._robotID:
 			for i in range(self._nbr_objects[robotID]):
 				if self._pose[robotID][i].shape[0] == 2 :
-					plt.text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID, color='white', horizontalalignment='center',verticalalignment='center')
+					plt.text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID,size = 50, color='white', horizontalalignment='center',verticalalignment='center')
 
 
 	def getPoses(self):
@@ -539,3 +541,90 @@ class SignColorTrack(ColorTrack):
 		image = cv2.cvtColor(cv2.cvtColor(image, cv2.COLOR_HSV2BGR),cv2.COLOR_BGR2GRAY)
 
 		return image
+
+class ArucoTrack(RobotTracking):
+	# def __init__(self, img_width=300):
+	# 	super().__init__( img_width=300)
+	# 	self.img_width = img_width
+	# 	self._image = None
+	# 	self._nbr_objects = {}
+	# 	self._pose = {}
+	# 	self.angle = {}
+	# 	self._robotID = []
+	# 	self.time = []
+
+	def track(self,image_name):
+		im = cv2.imread(image_name)
+
+		beginning = time.time()
+		resized = imutils.resize(im, width=self.img_width)
+		self._image = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+		dictionary = aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
+		markerCorners, markerIds , rejectedCandidates = aruco.detectMarkers(im, dictionary)
+
+		self._robotID = markerIds.reshape(-1)
+		pos = np.array(markerCorners).mean(axis=2)
+
+		for index, id in enumerate(self._robotID):
+			self._pose[id] = pos[index]
+			self._nbr_objects[id] = pos[index].shape[0]
+
+		end = time.time()
+		self.time.append(end-beginning)
+
+		
+
+
+
+
+	# def printRobotLocation(self):
+	# 	plt.figure(figsize=(50,50))
+	# 	plt.imshow(self._image)
+
+
+	# 	for robotID in self._robotID:
+	# 		for i in range(self._nbr_objects[robotID]):
+	# 			if self._pose[robotID][i].shape[0] == 2 :
+	# 				plt.text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID, color='white', horizontalalignment='center',verticalalignment='center')
+
+
+	# def getPoses(self):
+	# 	if len(self._pose)>0:
+	# 		return self._pose
+	# 	else:
+	# 		#print('There is no poses calculated yet')
+	# 		return {}
+
+	# def getPoseByID(self, robotID):
+	# 	return self._pose[robotID]
+	# def getRobotIDs(self):
+	# 	return self._robotID
+	# def getAngle(self, poses):
+	# 	poses2 = np.array([poses[1],poses[2],poses[0]])
+	# 	dist = ((poses - poses2)**2).sum(axis=1)**(0.5)
+	# 	# print('poses: '+ str(poses))
+	# 	# print('poses2: '+ str(poses2))
+	# 	# print('dist: '+ str(dist))
+	# 	p1 = np.delete(poses, dist.argmin()-1, 0)
+	# 	p1 = p1.sum(axis=0)/2
+
+	# 	p2 = poses[dist.argmin()-1]
+	# 	# print('p1: '+ str(p1))
+	# 	# print('p2: '+ str(p2))
+
+	# 	sub = (p2-p1)*(1,-1)
+	# 	# print('sub: '+ str(sub))
+	# 	angle = np.arctan(sub[1]/sub[0])*360/(2*np.pi)
+	# 	if(sub[0]<0 and sub[1]> 0):
+	# 		angle+= 180
+	# 	elif(sub[0]<0 and sub[1]< 0):
+	# 		angle-= 180
+
+
+
+	# 	return angle
+
+
+
+
+	#Define debug functions:
