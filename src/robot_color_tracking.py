@@ -543,15 +543,16 @@ class SignColorTrack(ColorTrack):
 		return image
 
 class ArucoTrack(RobotTracking):
-	# def __init__(self, img_width=300):
-	# 	super().__init__( img_width=300)
-	# 	self.img_width = img_width
-	# 	self._image = None
-	# 	self._nbr_objects = {}
-	# 	self._pose = {}
-	# 	self.angle = {}
-	# 	self._robotID = []
-	# 	self.time = []
+	def __init__(self, img_width=300):
+		super().__init__( img_width=300)
+		self.img_width = img_width
+		self._image = None
+		self._nbr_objects = {}
+		self._pose = {}
+		self.angle = {}
+		self._robotID = []
+		self.time = []
+		
 
 	def track(self,image_name):
 		im = cv2.imread(image_name)
@@ -559,15 +560,58 @@ class ArucoTrack(RobotTracking):
 		beginning = time.time()
 		resized = imutils.resize(im, width=self.img_width)
 		self._image = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+		ratio = self._image.shape[0] / float(resized.shape[0])
+
 		dictionary = aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
-		markerCorners, markerIds , rejectedCandidates = aruco.detectMarkers(im, dictionary)
 
-		self._robotID = markerIds.reshape(-1)
-		pos = np.array(markerCorners).mean(axis=2)
+		dictionary.bytesList = np.array([aruco.Dictionary_getByteListFromBits(np.array([[1, 1, 0, 1, 0, 0],
+			[1, 0, 1, 0, 1, 1],
+			[0, 1, 1, 0, 0, 0],
+			[1, 1, 1, 0, 1, 0],
+			[0, 0, 0, 0, 1, 0],
+			[0, 1, 1, 1, 0, 1]], dtype=np.uint8)).reshape(5,-1),                            
+			aruco.Dictionary_getByteListFromBits(np.array([[0, 1, 1, 0, 0, 0],
+			[0, 0, 0, 0, 0, 0],
+			[0, 0, 0, 1, 0, 0],
+			[0, 1, 0, 0, 1, 1],
+			[0, 1, 0, 0, 1, 1],
+			[1, 0, 0, 1, 0, 1]], dtype=np.uint8)).reshape(5,-1),
+			aruco.Dictionary_getByteListFromBits(np.array(
+			[[0, 0, 0, 1, 0, 0],
+			[1, 0, 0, 0, 0, 0],
+			[0, 1, 1, 0, 1, 1],
+			[1, 1, 1, 0, 1, 1],
+			[1, 1, 1, 0, 1, 1],
+			[1, 1, 0, 0, 1, 0]], dtype=np.uint8)).reshape(5,-1),
+			aruco.Dictionary_getByteListFromBits(np.array(
+			[[1, 1, 1, 1, 1, 1],
+			[1, 1, 1, 0, 0, 0],
+			[1, 0, 1, 0, 1, 1],
+			[0, 1, 0, 1, 1, 0],
+			[1, 1, 0, 0, 1, 0],
+			[1, 1, 0, 1, 0, 0]], dtype=np.uint8)).reshape(5,-1),])
 
+		markerCorners, markerIds , rejectedCandidates = aruco.detectMarkers(resized, dictionary)
+
+		self.markerCorners = markerCorners
+		for marker_id in markerCorners:
+			# print('----------------------------------------------------')
+			# print(self.markerCorners)
+			marker_id*= ratio
+			# print(self.markerCorners)
+		try:
+			self._robotID = []
+			for marker in markerIds.reshape(-1):
+				self._robotID.append(str(marker))
+			pos = np.array(markerCorners).mean(axis=2)
+		except:
+			pass
+		
+		self._pose = {}
 		for index, id in enumerate(self._robotID):
-			self._pose[id] = pos[index]
-			self._nbr_objects[id] = pos[index].shape[0]
+			# print('robotID: ' + str(self._robotID))
+			self._pose[str(id)] = pos[index]
+			self._nbr_objects[str(id)] = pos[index].shape[0]
 
 		end = time.time()
 		self.time.append(end-beginning)
@@ -577,15 +621,25 @@ class ArucoTrack(RobotTracking):
 
 
 
-	# def printRobotLocation(self):
-	# 	plt.figure(figsize=(50,50))
-	# 	plt.imshow(self._image)
+	def printRobotLocation(self):
+		# Create figure and axes
+		fig, ax = plt.subplots(figsize=(15,15))
 
+		# Display the image
+		ax.imshow(self._image)
 
-	# 	for robotID in self._robotID:
-	# 		for i in range(self._nbr_objects[robotID]):
-	# 			if self._pose[robotID][i].shape[0] == 2 :
-	# 				plt.text(self._pose[robotID][i][0], self._pose[robotID][i][1], robotID, color='white', horizontalalignment='center',verticalalignment='center')
+		for idx, i in enumerate(self.markerCorners):
+			for j in i:
+				# Create a Rectangle patch
+				rect = patches.Polygon(j,closed=True, linewidth=1, edgecolor='r', facecolor='none')
+
+				# Add the patch to the Axes
+				ax.add_patch(rect)
+				center = j.mean(axis=0)
+				# print(center)
+				ax.text(center[0], center[1], self._robotID[idx], color='yellow', horizontalalignment='center',verticalalignment='center')
+
+		plt.show()
 
 
 	# def getPoses(self):

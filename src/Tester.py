@@ -39,6 +39,8 @@ class Tester(object):
                 elif m == 'achromatic':
                     self.trackers[m] = track.AchromaticTrack(d=30,img_width=500, binaryThreshold= 40, hueTolerance=15, satTolerance=0, kernel = np.ones((3,3)),colors=id_options, debug=True)
                     # id_options = ['blue', 'green', 'red', 'yellow']
+                elif m == 'ArUco':
+                    self.trackers[m] = track.ArucoTrack(img_width=1000)
                 else:
                     raise Exception(m+' is not recognized as a method of tracking')
 
@@ -63,7 +65,12 @@ class Tester(object):
         # Compara o erro entre o resultado esperado e o erro encontrado
         for m in self.methods:
             data = self.positions_data[m]
-            
+            if(m == 'ArUco'):
+                for image_name in data:
+                    for marker_id in data[image_name]['position']:
+                        data[image_name]['position'][marker_id] = [np.array(data[image_name]['position'][marker_id]).mean(axis=0)]
+            # print(data)
+            # break
             path = '../img/'+m+'/'
             counterProgress = 0
             self.error[m] = {}
@@ -80,13 +87,25 @@ class Tester(object):
                 }
                 # Track and store actual and calculated poses
                 self.trackers[m].track(path+image)
+                # print(image)
                 calc_poses = self.trackers[m].getPoses()
+                # print('calc_poses: '+ str(calc_poses))
+                # if(m == 'ArUco'):
+                #     actual_poses = {}
+                #     for marker in data[image]["position"]:
+                #         actual_poses[marker] = np.array([np.array(data[image]["position"][marker]).mean(0)])
+                # else:
                 actual_poses = data[image]["position"]
+                # print('actual_poses: '+str(actual_poses))
+                # print('calc_poses: '+ str(calc_poses))
+                # break
                 # if m == 'achromatic' or 'colors_naive' or 'hough_colors':
                 #     calc_poses['green'] = calc_poses['cyan']
                 #     del(calc_poses['cyan'])
                 
                 for id_name in self.id_options:
+                    # print('\n******'+str(actual_poses))
+                    # print('\n------'+str(calc_poses))
                     if id_name in actual_poses:
                         if id_name in calc_poses:
                             err, false_positive, false_negative = self.calc_dist_error(calc_poses[id_name], actual_poses[id_name])
@@ -94,6 +113,7 @@ class Tester(object):
                                 angle_err = self.calc_angle_error(self.trackers[m].angle[id_name], self.trackers[m].getAngle(actual_poses[id_name]))
                             else:
                                 angle_err = None
+                            # print('\n ------- \n fp: '+str(false_positive)+'  \n')
                             self.error[m][image]['position_error'][id_name] = err
                             self.error[m][image]['angle_error'][id_name] = angle_err
                             self.error[m][image]['false_positive_total'] += false_positive
@@ -104,8 +124,11 @@ class Tester(object):
                             self.error[m][image]['false_negative_total']+= len(actual_poses[id_name])  
                     elif id_name in calc_poses:
                         self.error[m][image]['false_positive_total']+= len(calc_poses[id_name])
+                    # print('\n ------- \n self.fp: '+str(self.error[m][image]['false_positive_total'])+'  \n')
                 counterProgress+=1
+                # break
             print('\r'+m+': '+format(100*counterProgress/len(data),'.2f')+'%    i: '+str(self.i))
+            
             self.timeOfTrack[m] = self.trackers[m].time
     def save_error_and_time(self):
         for m in self.methods:
@@ -120,11 +143,19 @@ class Tester(object):
         actual = np.array(actual_positions)
         calculated = np.array(calculated_positions)
         result = []
+        # print('\n----------------')
+        # print('\nactual: ' + str(actual))
+        # print('\ncalculated: ' + str(calculated))
         
         for i in range(actual.size):
             if actual.size > 0 and calculated.size > 0:
+                
                 dist = calculated-actual[0]
+                # print(dist)
+                # print(dist[:,1])
                 dist = np.sqrt(dist[:,0]**2+dist[:,1]**2)
+                
+                # print(dist.min())
                 if(dist.min()<100):
                     result.append(dist.min())
                     calculated = np.delete(calculated, dist.argmin(), 0)
@@ -136,7 +167,11 @@ class Tester(object):
         
         false_positives = calculated.shape[0]
         false_negatives = actual.shape[0]
-        
+        # print('\nfalse_positives: ' + str(false_positives))
+        # print('\nfalse_negatives: ' + str(false_negatives))
+        # print('\ndist: ' + str(dist))
+       
+
         return result, false_positives, false_negatives
 
 
@@ -241,8 +276,11 @@ class Tester(object):
         for img_name in filtered_local:
             for id_name in filtered_local[img_name]['position_error']:
                 error_vector = error_vector + filtered_local[img_name]['position_error'][id_name]
-                if(filtered_local[img_name]['angle_error'][robot_id] != None):
-                    ang_error_vector = ang_error_vector + [filtered_local[img_name]['angle_error'][robot_id]]
+                try:
+                    if(filtered_local[img_name]['angle_error'][robot_id] != None):
+                        ang_error_vector = ang_error_vector + [filtered_local[img_name]['angle_error'][robot_id]]
+                except:
+                    pass
         
         return error_vector, ang_error_vector
     def get_total_positions(self,filtered_local):
