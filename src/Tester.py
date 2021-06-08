@@ -59,7 +59,7 @@ class Tester(object):
                 self.error[m] = json.load(f)
             with open('../algorithm_performance_data/time/time_'+folder+m+'.json', 'r') as f:
                 self.timeOfTrack[m] = json.load(f)
-
+            
         print("Real positions, error and time of track loaded")
     def evaluate_error(self):
         # Compara o erro entre o resultado esperado e o erro encontrado
@@ -67,8 +67,12 @@ class Tester(object):
             data = self.positions_data[m]
             if(m == 'ArUco'):
                 for image_name in data:
+                    data[image_name]['angle'] = {}
                     for marker_id in data[image_name]['position']:
+                        data[image_name]['angle'][marker_id] = self.trackers[m].getAngle(np.array([data[image_name]['position'][marker_id]]))
                         data[image_name]['position'][marker_id] = [np.array(data[image_name]['position'][marker_id]).mean(axis=0)]
+                        
+                        
             # print(data)
             # break
             path = '../img/'+m+'/'
@@ -111,6 +115,10 @@ class Tester(object):
                             err, false_positive, false_negative = self.calc_dist_error(calc_poses[id_name], actual_poses[id_name])
                             if(id_name in self.trackers[m].angle and len(actual_poses[id_name])==3):
                                 angle_err = self.calc_angle_error(self.trackers[m].angle[id_name], self.trackers[m].getAngle(actual_poses[id_name]))
+                            elif(m == 'ArUco'):
+                                angle_err = self.calc_angle_error(self.trackers[m].angle[id_name], data[image]["angle"][id_name])
+                                # print('\nactual: '+ str(data[image]["angle"][id_name]))
+                                # print('calculated: '+ str(self.trackers[m].angle[id_name]))
                             else:
                                 angle_err = None
                             # print('\n ------- \n fp: '+str(false_positive)+'  \n')
@@ -190,7 +198,8 @@ class Tester(object):
                 positions, angles = self.get_only_error(place_imgs)
                 positions = np.array(positions)
                 angles = np.array(angles)
-
+                # print(angles)
+                # print('hello')
                 total = self.statistics[m][place]['total_positions'] = self.get_total_positions(real_positions_filtered)
                 self.statistics[m][place]['distance_mean'] = positions.mean()
                 self.statistics[m][place]['angle_mean'] = angles.mean()
@@ -206,6 +215,17 @@ class Tester(object):
     def get_statistics_by_id(self, pos_data = None, err = None):
         if(pos_data == None):
             pos_data = self.positions_data
+        # if('ArUco' in self.methods):
+        #     # print('--------------------------------------')
+        #     # print('Foi')
+        #     # print('--------------------------------------')
+        #     data = pos_data['ArUco']
+        #     for image_name in data:
+        #         data[image_name]['angle'] = {}
+        #         for marker_id in data[image_name]['position']:
+        #             data[image_name]['angle'][marker_id] = self.trackers['ArUco'].getAngle(np.array([data[image_name]['position'][marker_id]]))
+        #             data[image_name]['position'][marker_id] = [np.array(data[image_name]['position'][marker_id]).mean(axis=0)]
+        #     pos_data['ArUco'] = data
         if(err == None):
             err = self.error
         for m in self.methods:
@@ -218,7 +238,9 @@ class Tester(object):
                 positions, angles = self.get_only_error_id(id_imgs,robot_id)
                 positions = np.array(positions)
                 angles = np.array(angles)
-
+                # print('real_positions_filtered ('+str(robot_id)+'): ')
+                # print(real_positions_filtered)
+                # input()
                 total = self.statistics[m][robot_id]['total_positions'] = self.get_total_positions_id(real_positions_filtered, robot_id)
                 self.statistics[m][robot_id]['distance_mean'] = positions.mean()
                 self.statistics[m][robot_id]['angle_mean'] = angles.mean()
@@ -277,15 +299,14 @@ class Tester(object):
             for id_name in filtered_local[img_name]['position_error']:
                 error_vector = error_vector + filtered_local[img_name]['position_error'][id_name]
                 try:
-                    if(filtered_local[img_name]['angle_error'][robot_id] != None):
-                        ang_error_vector = ang_error_vector + [filtered_local[img_name]['angle_error'][robot_id]]
+                    if(filtered_local[img_name]['angle_error'][id_name] != None):
+                        ang_error_vector = ang_error_vector + [filtered_local[img_name]['angle_error'][id_name]]
                 except:
                     pass
         
         return error_vector, ang_error_vector
     def get_total_positions(self,filtered_local):
         total = 0
-        
         for img_name in filtered_local:
             for id_name in self.id_options:
                 if(id_name in filtered_local[img_name]['position']):

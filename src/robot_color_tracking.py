@@ -611,6 +611,8 @@ class ArucoTrack(RobotTracking):
 		for index, id in enumerate(self._robotID):
 			# print('robotID: ' + str(self._robotID))
 			self._pose[str(id)] = pos[index]
+			# print('\n\naqui -> '+str(markerCorners[index])+'\n\n')
+			self.angle[id] = self.getAngle(markerCorners[index])
 			self._nbr_objects[str(id)] = pos[index].shape[0]
 
 		end = time.time()
@@ -632,10 +634,14 @@ class ArucoTrack(RobotTracking):
 			for j in i:
 				# Create a Rectangle patch
 				rect = patches.Polygon(j,closed=True, linewidth=1, edgecolor='r', facecolor='none')
-
+				
 				# Add the patch to the Axes
 				ax.add_patch(rect)
 				center = j.mean(axis=0)
+
+				plt.arrow(x = center[0], y = center[1],
+              			  dx = np.cos(self.angle[self._robotID[idx]]*2*np.pi/360)*70,
+              			  dy=np.sin(self.angle[self._robotID[idx]]*2*np.pi/360)*70, width= 30, color = 'r')
 				# print(center)
 				ax.text(center[0], center[1], self._robotID[idx], color='yellow', horizontalalignment='center',verticalalignment='center')
 
@@ -653,27 +659,22 @@ class ArucoTrack(RobotTracking):
 	# 	return self._pose[robotID]
 	# def getRobotIDs(self):
 	# 	return self._robotID
-	# def getAngle(self, poses):
-	# 	poses2 = np.array([poses[1],poses[2],poses[0]])
-	# 	dist = ((poses - poses2)**2).sum(axis=1)**(0.5)
-	# 	# print('poses: '+ str(poses))
-	# 	# print('poses2: '+ str(poses2))
-	# 	# print('dist: '+ str(dist))
-	# 	p1 = np.delete(poses, dist.argmin()-1, 0)
-	# 	p1 = p1.sum(axis=0)/2
+	def getAngle(self, poses):
+		p1 = poses[0,0:2].mean(axis=0)
+		p2 = poses[0,2:4].mean(axis=0)
+		p3 = np.array([p1,p2]).mean(axis=0)
+		
+		sub = p1-p3
+		if sub[0] == 0:
+			angle = 90*sub[1]/np.abs(sub[1])
+		else:
+			angle = np.arctan(sub[1]/sub[0])*360/(2*np.pi)
+		if(sub[0]<0 and sub[1]> 0):
+			angle+= 180
+		elif(sub[0]<0 and sub[1]< 0):
+			angle-= 180
 
-	# 	p2 = poses[dist.argmin()-1]
-	# 	# print('p1: '+ str(p1))
-	# 	# print('p2: '+ str(p2))
-
-	# 	sub = (p2-p1)*(1,-1)
-	# 	# print('sub: '+ str(sub))
-	# 	angle = np.arctan(sub[1]/sub[0])*360/(2*np.pi)
-	# 	if(sub[0]<0 and sub[1]> 0):
-	# 		angle+= 180
-	# 	elif(sub[0]<0 and sub[1]< 0):
-	# 		angle-= 180
-
+		return angle
 
 
 	# 	return angle
